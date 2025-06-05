@@ -174,3 +174,4 @@ cython_debug/
 .pypirc
 
 # source venv/bin/activate
+*.vscode/
