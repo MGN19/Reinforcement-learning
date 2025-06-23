@@ -1,5 +1,9 @@
 import gymnasium as gym
 import numpy as np
+import torch
+import torch.nn as nn
+import random
+
 
 # Random Agent Runner
 def run_agent(
@@ -89,3 +93,80 @@ def run_episodes(model, env, n_episodes=10):
         episode_rewards.append(total_reward)
         print(f"Episode {episode+1}: Reward = {total_reward:.2f}")
     return episode_rewards
+
+## Torch DQN Implementation
+
+# Define the Q-network (Deep Q-Network - DQN)
+class QNet(nn.Module):
+
+    # Fully connected layers: input → hidden → hidden → output
+    def __init__(self, obs_dim, act_dim):
+        super().__init__()
+        self.fc = nn.Sequential(
+            nn.Linear(obs_dim, 128),
+            nn.ReLU(), # Activation function
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, act_dim)
+        )
+
+    # Forward pass: compute Q-values for a given batch of states
+    def forward(self, x):
+        return self.fc(x)
+
+    # Predict method: returns the best action for a given observation
+    def predict(self, obs, state=None, episode_start=None, deterministic=True):
+        with torch.no_grad():
+            obs_tensor = torch.FloatTensor(obs).unsqueeze(0).to(self.fc[0].weight.device)
+            action = self.forward(obs_tensor).argmax().item()
+        return action, None
+
+# Action selection with ε-greedy
+def select_action(model, state, epsilon, action_space):
+    if random.random() < epsilon:
+        return action_space.sample()
+    else:
+        action, _ = model.predict(state)
+        return action
+    
+# Model training function
+def train_dqn(model, env, optimizer, device, episodes, gamma, 
+              epsilon_start, epsilon_end, epsilon_decay, max_steps=1000):
+    reward_history = []
+    epsilon = epsilon_start
+
+    for episode in range(episodes):
+        state, _ = env.reset()
+        total_reward = 0
+
+        for t in range(max_steps):
+            # Select action (ε-greedy)
+            action = select_action(model, state, epsilon, env.action_space)
+            next_state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            total_reward += reward
+
+            # Compute target Q-value
+            with torch.no_grad():
+                next_q = model(torch.FloatTensor(next_state).unsqueeze(0).to(device))
+                target = reward + gamma * next_q.max().item() * (1 - done)
+
+            # Current Q-value
+            q_vals = model(torch.FloatTensor(state).unsqueeze(0).to(device))
+            q_val = q_vals[0, action]
+
+            # Loss and backpropagation
+            loss = (q_val - target) ** 2
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            state = next_state
+            if done:
+                break
+
+        reward_history.append(total_reward)
+        epsilon = max(epsilon_end, epsilon * epsilon_decay)
+        print(f"Episode {episode}: Reward = {total_reward:.1f}, Epsilon = {epsilon:.3f}")
+
+    return model, reward_history
