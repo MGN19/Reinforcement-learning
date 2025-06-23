@@ -79,7 +79,7 @@ def rule_based_action(obs):
     return 0  # default to doing nothing
 
 # Episodes for Stable Baselines3 model
-def run_episodes(model, env, n_episodes=10):
+def run_episodes_get_rewards(model, env, n_episodes=10):
     episode_rewards = []
     for episode in range(n_episodes):
         obs, info = env.reset()  
@@ -170,3 +170,26 @@ def train_dqn(model, env, optimizer, device, episodes, gamma,
         print(f"Episode {episode}: Reward = {total_reward:.1f}, Epsilon = {epsilon:.3f}")
 
     return model, reward_history
+
+# Evaluate the trained model
+def evaluate_model(model, env, n_episodes=100, render=False):
+    rewards = []
+    for episode in range(n_episodes):
+        obs, _ = env.reset()
+        done = False
+        total_reward = 0
+        while not done:
+            if render:
+                env.render()
+            # Use deterministic action (no exploration)
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            total_reward += reward
+        rewards.append(total_reward)
+
+    env.close()
+    avg_reward = sum(rewards) / n_episodes
+    std_reward = (sum((r - avg_reward) ** 2 for r in rewards) / n_episodes) ** 0.5
+
+    return rewards, avg_reward, std_reward
