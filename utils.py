@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import random
+import matplotlib.pyplot as plt
 
 
 # Random Agent Runner
@@ -193,3 +194,78 @@ def evaluate_model(model, env, n_episodes=100, render=False):
     std_reward = (sum((r - avg_reward) ** 2 for r in rewards) / n_episodes) ** 0.5
 
     return rewards, avg_reward, std_reward
+
+## Plots
+
+
+# Plotting function for reward trend
+def plot_reward_trend(episode_logs, window_size=10):
+    episode_rewards = [ep["total_reward"] for ep in episode_logs]
+    if len(episode_rewards) < window_size:
+        window_size = len(episode_rewards)  
+    
+    rolling_avg = np.convolve(episode_rewards, np.ones(window_size)/window_size, mode='valid')
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(episode_rewards, label='Episode Reward')
+    plt.plot(range(window_size - 1, len(episode_rewards)), rolling_avg, label=f'{window_size}-Episode Moving Average', color='red')
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.title("Reward Trend Over Episodes")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# Scatter plot of actions taken in an episode
+def scatter_plot_actions(actions, episode=0):
+    """
+    Scatter plot of actions taken over time steps in a single episode.
+
+    actions: List of lists, each inner list contains actions from one episode.
+    episode: index of the episode to plot
+    """
+    episode_actions = actions[episode]
+
+    plt.figure(figsize=(12, 4))
+    plt.scatter(range(len(episode_actions)), episode_actions, c=episode_actions, cmap="viridis", s=10)
+    plt.xlabel("Time Step")
+    plt.ylabel("Action")
+    plt.title(f"Actions Scatter Plot in Episode {episode + 1}")
+    plt.yticks(np.unique(episode_actions))
+    plt.colorbar(label='Action Value')
+    plt.grid(True)
+    plt.show()
+
+
+# Plot action usage over time
+def plot_action_usage_over_time(episode_logs, chunk_size=50, env=None):
+    n_chunks = len(episode_logs) // chunk_size
+    action_counts = []
+    
+    for i in range(n_chunks):
+        chunk_actions = [a for ep in episode_logs[i*chunk_size:(i+1)*chunk_size] for a in ep["actions"]]
+        counts, _ = np.histogram(chunk_actions, bins=np.arange(env.action_space.n + 1))
+        action_counts.append(counts)
+    
+    action_counts = np.array(action_counts)
+    
+    plt.figure(figsize=(12,6))
+    for action in range(action_counts.shape[1]):
+        plt.plot(range(n_chunks), action_counts[:, action], label=f"Action {action}")
+    plt.xlabel(f"Episode chunks (size={chunk_size})")
+    plt.ylabel("Action count")
+    plt.title("Action Usage Over Training")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# Plot episode lengths over time
+def plot_episode_lengths(episode_logs):
+    lengths = [len(ep["actions"]) for ep in episode_logs]
+    plt.figure(figsize=(10,5))
+    plt.plot(lengths)
+    plt.xlabel("Episode")
+    plt.ylabel("Episode Length (timesteps)")
+    plt.title("Episode Length over Time")
+    plt.grid(True)
+    plt.show()
