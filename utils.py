@@ -173,27 +173,49 @@ def train_dqn(model, env, optimizer, device, episodes, gamma,
     return model, reward_history
 
 # Evaluate the trained model
-def evaluate_model(model, env, n_episodes=100, render=False):
+def evaluate_model(model, env, n_episodes=100, render=False, log_actions=False):
     rewards = []
+    action_logs = []  
+
     for episode in range(n_episodes):
         obs, _ = env.reset()
         done = False
         total_reward = 0
+        actions = []
+
         while not done:
             if render:
                 env.render()
-            # Use deterministic action (no exploration)
+
+            # Deterministic action
             action, _ = model.predict(obs, deterministic=True)
+
+            if log_actions:
+                actions.append(action)
+
             obs, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             total_reward += reward
+
         rewards.append(total_reward)
 
+        if log_actions:
+            action_logs.append({
+                "episode": episode,
+                "total_reward": total_reward,
+                "actions": actions
+            })
+
     env.close()
+
     avg_reward = sum(rewards) / n_episodes
     std_reward = (sum((r - avg_reward) ** 2 for r in rewards) / n_episodes) ** 0.5
 
-    return rewards, avg_reward, std_reward
+    if log_actions:
+        return rewards, avg_reward, std_reward, action_logs
+    else:
+        return rewards, avg_reward, std_reward
+
 
 ## Plots
 
